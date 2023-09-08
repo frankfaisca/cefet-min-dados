@@ -158,8 +158,32 @@ params <- list( k = c(200,400,800,1600) )
 as.integer(params[['k']] )
 result <- k_means_test(split_sick[,1:5], split_sick$exam.result, params)
 
-# --- caso precise usar samples --- #
-sample <- sample_stratified("exam.result")
-folds <- k_fold(sample, split_infection_region, 2)
-my_sample <- folds[[1]]
-result <- k_means_test(my_sample[,1:4], my_sample[,5], params)
+# --  Pattern Prediction -- #
+
+#Iris example
+source("https://raw.githubusercontent.com/cefet-rj-dal/daltoolbox-examples/main/jupyter.R")
+load_library("daltoolbox")
+iris <- datasets::iris
+head(iris)
+slevels <- levels(iris$Species)
+slevels
+set.seed(1)
+sr <- sample_random()
+sr <- train_test(sr, iris)
+iris_train <- sr$train
+iris_test <- sr$test
+tbl <- rbind(table(iris[,"Species"]), 
+             table(iris_train[,"Species"]), 
+             table(iris_test[,"Species"]))
+rownames(tbl) <- c("dataset", "training", "test")
+head(tbl)
+model <- cla_dtree("Species", slevels)
+model <- fit(model, iris_train)
+train_prediction <- predict(model, iris_train)
+iris_train_predictand <- adjust_class_label(iris_train[,"Species"])
+train_eval <- evaluate(model, iris_train_predictand, train_prediction)
+print(train_eval$metrics)
+test_prediction <- predict(model, iris_test)
+iris_test_predictand <- adjust_class_label(iris_test[,"Species"])
+test_eval <- evaluate(model, iris_test_predictand, test_prediction)
+print(test_eval$metrics)
