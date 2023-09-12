@@ -187,3 +187,37 @@ test_prediction <- predict(model, iris_test)
 iris_test_predictand <- adjust_class_label(iris_test[,"Species"])
 test_eval <- evaluate(model, iris_test_predictand, test_prediction)
 print(test_eval$metrics)
+
+#Training on Malaria Set
+load("/home/data/malaria/malaria.RData")
+#Comparando quantidade de dados nulos e não nulos
+data.na <- na.omit(data)
+#22923977/466127 = 49.17968     >> Só 2% dos dados são mantidos
+results_list <- list()
+for (feature in data) {
+  x <- na.omit(feature)
+  results_list <- append(results_list, list(x))
+}
+
+num_itens <- list()
+for (feature in results_list) {
+  x <- length(feature)
+  num_itens <- append(num_itens, x)
+}
+
+feature_names <- names(data)
+check_df <- data.frame(matrix(unlist(num_itens), ncol = length(num_itens), byrow = FALSE))
+colnames(check_df) <- feature_names
+new_column <- c("Valores") #Casa de Ferreiro
+check_df <- data.frame(NewColumnName = new_column, check_df) #Espeto de Pau
+
+
+library("daltoolbox")
+library("RColorBrewer")
+library("ggplot2")
+colors <- brewer.pal(4, 'Set1')
+font <- theme(text = element_text(size=16))
+library("dplyr")
+options(scipen = 999)
+grf <- plot_groupedbar(check_df) + font #Não conseguiu plotar 40 colres
+plot(grf)
