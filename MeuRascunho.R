@@ -219,5 +219,217 @@ colors <- brewer.pal(4, 'Set1')
 font <- theme(text = element_text(size=16))
 library("dplyr")
 options(scipen = 999)
+
 grf <- plot_groupedbar(check_df) + font #Não conseguiu plotar 40 colres
 plot(grf)
+
+#Separando grupos
+pequenos <- c("notification.hr", "notification.county", "exam.type", "exam.result",
+             "hemiparasite", "detection.type", "cvl.case", "notification.state",
+             "notification.month", "notification.year", "previous.treatment")
+grandes <- c("NewColumnName", "notification.hr", "notification.county", "exam.type",
+             "exam.result",
+             "hemiparasite", "detection.type", "cvl.case", "notification.state",
+             "notification.month", "notification.year", "previous.treatment")
+
+# Delete columns by excluding them using negative index
+check_df_pequeno <- check_df[, !names(check_df) %in% pequenos]
+grf2 <- plot_groupedbar(check_df_pequeno) + font #Não conseguiu plotar 40 colres
+plot(grf2)
+
+check_df_grande <- check_df[, names(check_df) %in% grandes]
+grf3 <- plot_groupedbar(check_df_grande) + font #Não conseguiu plotar 40 colres
+plot(grf3)
+
+#Criando o grupo 1
+grupo_grande <- c("notification.hr", "notification.county", "exam.type","exam.result",
+              "hemiparasite", "detection.type", "cvl.case", "notification.state",
+              "notification.month", "notification.year", "previous.treatment")
+grupo_1 <- na.omit( data[, names(data) %in% grupo_grande] )
+
+#Criando o grupo 2
+grupo_pequeno <- c("race", "qty.parasites")
+grupo_2 <- na.omit( data[, !names(data) %in% grupo_pequeno] )
+
+#Dataset Grupo 1
+set.seed(1)
+sr1 <- sample_random()
+sr1 <- train_test(sr1, grupo_1)
+sr1_train <- sr1$train
+sr1_test <- sr1$test
+slevels <- levels(grupo_1$exam.result)
+
+#Dataset Grupo 2
+sr2 <- sample_random()
+sr2 <- train_test(sr2, grupo_2)
+sr2_train <- sr2$train
+sr2_test <- sr2$test
+slevels <- levels(grupo_2$exam.result)
+
+#Majority train grupo 1
+model1 <- cla_majority("exam.result", slevels)
+model1 <- fit(model1, sr1_train)
+train_prediction1 <- predict(model1, sr1_train)
+train_predictand1 <- adjust_class_label(sr1_train[,"exam.result"])
+train_eval <- evaluate(model1, train_predictand1, train_prediction1)
+print(train_eval$metrics)
+
+metricas <- data.frame(
+  name = "train_g1",
+  accuracy = train_eval$accuracy,
+  f1 = train_eval$f1,
+  sensitivity = train_eval$sensitivity,
+  specificity = train_eval$specificity,
+  precision = train_eval$precision,
+  recall = train_eval$recall
+)
+
+test_prediction <- predict(model1, sr1_test)
+test_predictand1 <- adjust_class_label(sr1_test[,"exam.result"])
+test_eval <- evaluate(model1, test_predictand1, test_prediction)
+
+new_row <- data.frame(
+  name = "test_g1",
+  accuracy = test_eval$accuracy,
+  f1 = test_eval$f1,
+  sensitivity = test_eval$sensitivity,
+  specificity = test_eval$specificity,
+  precision = test_eval$precision,
+  recall = test_eval$recall
+)
+metricas <- rbind(metricas, new_row)
+
+#Majority treinamento grupo 2
+model <- cla_majority("exam.result", slevels)
+model <- fit(model, sr2_train)
+train_prediction <- predict(model, sr2_train)
+train_predictand <- adjust_class_label(sr2_train[,"exam.result"])
+train_eval <- evaluate(model, train_predictand, train_prediction)
+
+new_row <- data.frame(
+  name = "train_g2",
+  accuracy = train_eval$accuracy,
+  f1 = train_eval$f1,
+  sensitivity = train_eval$sensitivity,
+  specificity = train_eval$specificity,
+  precision = train_eval$precision,
+  recall = train_eval$recall
+)
+metricas <- rbind(metricas, new_row)
+
+test_prediction <- predict(model, sr2_test)
+test_predictand <- adjust_class_label(sr2_test[,"exam.result"])
+test_eval <- evaluate(model, test_predictand, test_prediction)
+
+new_row <- data.frame(
+  name = "test_g2",
+  accuracy = test_eval$accuracy,
+  f1 = test_eval$f1,
+  sensitivity = test_eval$sensitivity,
+  specificity = test_eval$specificity,
+  precision = test_eval$precision,
+  recall = test_eval$recall
+)
+metricas <- rbind(metricas, new_row)
+
+
+#Plot majority results
+grf <- plot_groupedbar(metricas) + font
+plot(grf)
+
+t_metricas <- t(metricas)
+colnames(t_metricas) <- t_metricas[1, ]
+t_metricas <- t_metricas[-1, ]
+t_metricas <- cbind(c("Accuracy","F1", "Sensitivity", "Specificity",
+                                  "Precision", "Recall"), t_metricas )
+
+grf <- plot_groupedbar(t_metricas) + font
+plot(grf)
+
+new_metrics <- subset(t_metricas, select = -train_g1)
+new_metrics <- subset(new_metrics, select = -train_g2)
+colnames(new_metrics)[2] <- "Majority_G1"
+colnames(new_metrics)[3] <- "Majority_G2"
+
+#Naive Bayes
+model <- cla_nb("exam.result", slevels)
+model <- fit(model, sr1_train)
+train_prediction <- predict(model, sr1_train)
+train_predictand <- adjust_class_label(sr1_train[,"exam.result"])
+train_eval <- evaluate(model, train_predictand, train_prediction)
+print(train_eval$metrics)
+test_prediction <- predict(model, sr1_test)
+test_predictand <- adjust_class_label(sr1_test[,"exam.result"])
+test_eval <- evaluate(model, test_predictand, test_prediction)
+print(test_eval$metrics)
+
+new_metrics <- cbind(new_metrics, c(test_eval$accuracy, test_eval$f1,
+                                    test_eval$sensitivity,test_eval$specificity,
+                                    test_eval$precision,test_eval$recall))
+colnames(new_metrics)[4] <- "NaiveBayes_G1"
+rownames(new_metrics) <- NULL
+
+grf <- plot_groupedbar(new_metrics) + font
+plot(grf)
+
+
+#Naive Bayes Grupo 2
+model <- cla_nb("exam.result", slevels2)
+model <- fit(model, sr2_train)
+train_prediction <- predict(model, sr2_train)
+train_predictand <- adjust_class_label(sr2_train[,"exam.result"])
+train_eval <- evaluate(model, train_predictand, train_prediction)
+print(train_eval$metrics)
+test_prediction <- predict(model, sr2_test)
+test_predictand <- adjust_class_label(sr2_test[,"exam.result"])
+test_eval <- evaluate(model, test_predictand, test_prediction)
+print(test_eval$metrics)
+
+backup_metrics <- new_metrics
+new_metrics <- cbind(new_metrics, c(test_eval$accuracy, test_eval$f1,
+                                    test_eval$sensitivity,test_eval$specificity,
+                                    test_eval$precision,test_eval$recall))
+colnames(new_metrics)[5] <- "NaiveBayes_G2"
+rownames(new_metrics) <- NULL
+
+new_metrics_df <- as.data.frame(new_metrics)
+colnames(new_metrics_df) <- c("Metric", "Majority_G1", "Majority_G2", "NaiveBayes_G1", "NaiveBayes_G2")
+rownames(new_metrics_df) <- NULL
+
+# Ensure the column is treated as character
+new_metrics_df$Majority_G1 <- as.character(new_metrics_df$Majority_G1)
+new_metrics_df$Majority_G2 <- as.character(new_metrics_df$Majority_G2)
+new_metrics_df$NaiveBayes_G1 <- as.character(new_metrics_df$NaiveBayes_G1)
+new_metrics_df$NaiveBayes_G2 <- as.character(new_metrics_df$NaiveBayes_G2)
+
+# Convert the column to numeric and round to 3 decimals
+new_metrics_df$Majority_G1 <- round(as.numeric(new_metrics_df$Majority_G1), 3)
+new_metrics_df$Majority_G2 <- round(as.numeric(new_metrics_df$Majority_G2), 3)
+new_metrics_df$NaiveBayes_G1 <- round(as.numeric(new_metrics_df$NaiveBayes_G1), 3)
+new_metrics_df$NaiveBayes_G2 <- round(as.numeric(new_metrics_df$NaiveBayes_G2), 3)
+
+new_metrics_df$Majority_G1 <- as.double(new_metrics_df$Majority_G1)
+new_metrics_df$Majority_G2 <- as.double(new_metrics_df$Majority_G2)
+new_metrics_df$NaiveBayes_G1 <- as.double(new_metrics_df$NaiveBayes_G1)
+new_metrics_df$NaiveBayes_G2 <- as.double(new_metrics_df$NaiveBayes_G2)
+
+grf <- plot_groupedbar(new_metrics_df) + font
+plot(grf)
+
+# RANDOM FOREST
+#Não funcionou
+
+#Árvores
+#model1 <- cla_dtree("exam.result", slevels)
+#model1 <- fit(model1, sr1_train)
+#train_prediction1 <- predict(model1, sr1_train)
+
+#Não foi possível treinar algoritmos de árvores de decisão porque algumas features
+# categóricas tinham mais de 32 factors
+factor_columns <- names(sr1_train)[sapply(sr1_train, is.factor)]
+# Iterate through factor columns and count the number of levels
+for (col_name in factor_columns) {
+  num_levels <- nlevels(sr1_train[[col_name]])
+  cat("Number of levels in '", col_name, "':", num_levels, "\n")
+}
+
